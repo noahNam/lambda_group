@@ -1,13 +1,8 @@
-import json
 import os
-from typing import List
-from datetime import datetime
 
 import pymysql
 import boto3
 import logging
-
-from botocore.exceptions import ClientError
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -59,57 +54,6 @@ def openConnection():
     except Exception as e:
         logger.exception("Unexpected error: Could not connect to RDS instance. %s", e)
         raise e
-
-
-# def update_notification_schema(query_result: List):
-#     logger.info("Update notification schema start")
-#     update_data = list()
-#     for data in query_result:
-#         update_data.append((data[0], data[1], data[5], datetime.now()))
-#     try:
-#         openConnection()
-#         with conn.cursor() as cur:
-#             execute_values(cur,
-#                            """
-#                            update notifications
-#                            set endpoint=data.endpoint,status=data.status, updated_at=data.updated_at
-#                            from (VALUES %s) as data (id, endpoint, status, updated_at)
-#                            where notifications.id=data.id
-#                            """, update_data)
-#             conn.commit()
-#         logger.info("Update notification schema end")
-#     except Exception as e:
-#         logger.exception("Error while opening connection or processing. %s", e)
-#     finally:
-#         logger.info("Closing Connection")
-#         if conn is not None and conn.status == STATUS_BEGIN:
-#             conn.close()
-
-
-def get_push_target_user_data():
-    item_count = 0
-    query_result = list()
-    try:
-        openConnection()
-        with conn.cursor() as cur:
-            cur.execute(
-                f"select id, endpoint, data, user_id, token, status from notifications where category='{CATEGORY}' and status = '{STATUS}' ")
-            cur.execute('insert into Employee3 (EmpID, Name) values(1, "Joe")')
-            for row in cur:
-                rslt = list()
-                for data in row:
-                    rslt.append(data)
-
-                query_result.append(rslt)
-                item_count += 1
-    except Exception as e:
-        logger.exception("Error while opening connection or processing. %s", e)
-    finally:
-        logger.info("Closing Connection")
-        if conn is not None and conn.status == 1:
-            conn.close()
-
-    return dict(item_count=item_count, query_result=query_result)
 
 
 def receive_sqs():
@@ -189,19 +133,6 @@ def receive_after_delete() -> bool:
 def run():
     result = receive_sqs()
     return result
-
-
-# result: dict = get_push_target_user_data()
-
-# delete endpoint
-# delete_application_endpoint(result['query_result'])
-# return
-
-# if len(result['query_result']) > 0:
-#     send_sns_notification(result['query_result'])
-#     update_notification_schema(result['query_result'])
-
-# return "Selected %d items from RDS table" % result['item_count']
 
 
 if __name__ == "__main__":
