@@ -26,13 +26,13 @@ database = "apartalk_data_lake"
 port = 3306
 
 # set enum
-AWS_ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY") or "AKIATBBH6H6PNXVM54ND"
-AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY") or "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"
+AWS_ACCESS_KEY = os.environ.get("ACCESS_KEY") or "AKIATBBH6H6PNXVM54ND"
+AWS_SECRET_ACCESS_KEY = os.environ.get("SECRET_ACCESS_KEY") or "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"
 AWS_REGION_NAME = os.environ.get("AWS_REGION_NAME") or "ap-northeast-2"
 
 # SQS
 SQS_BASE = os.environ.get("SQS_BASE") or "https://sqs.ap-northeast-2.amazonaws.com/208389685150"
-SQS_NAME = os.environ.get("SQS_NAME") or "USER_DATA_SYNC_TO_LAKE_QUEUE"
+SQS_NAME = os.environ.get("SQS_NAME") or "USER_DATA_SYNC_TO_LAKE_QUEUE.fifo"
 
 # SLACK
 SLACK_TOKEN = os.environ.get("SLACK_TOKEN") or "xoxb-1811487173312-2075478573287-JtTJbgy3fAboqlwkLeas9R1o"
@@ -56,6 +56,8 @@ def openConnection():
         if conn is None:
             conn = pymysql.connect(
                 host=host, db=database, user=user, password=password, port=port, connect_timeout=5)
+        else:
+            conn.ping(reconnect=True)
 
     except Exception as e:
         logger.exception("Unexpected error: Could not connect to RDS instance. %s", e)
@@ -88,7 +90,7 @@ def push_user_data_to_lake_schema(msg_list: List):
     except Exception as e:
         logger.exception("Error while opening connection or processing. %s", e)
     finally:
-        if conn is not None:
+        if conn or conn.is_connected():
             conn.close()
             logger.info("Closing Connection")
 
@@ -111,7 +113,6 @@ def receive_sqs():
                 logger.info("[receive_sqs] Target Message %s", message['Body'])
     except Exception as e:
         logger.debug("SQS Fail : {}".format(e))
-        send_slack_message('Exception: {}'.format(str(e)), "[FAIL] SQS_USER_DATA_SYNC_TO_LAKE")
 
     #### 처리 로직 -> data push to data lake ####
     push_user_data_to_lake_schema(msg_list)
@@ -127,9 +128,11 @@ def receive_sqs():
                 QueueUrl=SQS_BASE + "/" + SQS_NAME, Entries=entries
             )
         except Exception as e:
-            print("~~~~~~`")
+            logger.exception("Error while delete messages or processing. %s", e)
 
         if len(resp['Successful']) != len(entries):
+            send_slack_message('Exception: {}'.format(str(e)),
+                               f"[FAIL] Failed to delete messages: entries={entries!r} resp={resp!r}")
             raise RuntimeError(
                 f"Failed to delete messages: entries={entries!r} resp={resp!r}"
             )

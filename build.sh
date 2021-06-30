@@ -1,1 +1,1 @@
-zip -r lambda.zip ./psycopg2 ./lambda_function.py
+zip -r lambda.zip ./certifi ./chardet ./idna ./package ./lambda_function.py
