@@ -64,11 +64,11 @@ def push_user_data_to_lake_schema(msg_list: List):
         with conn.cursor() as cur:
             for msg in msg_list:
                 try:
-                    data = json.loads(msg['Body'])
+                    data = json.loads(msg)
                     data = data['msg']
                     cur.execute(
                         """
-                            INSERT INTO TANOS_USER_INFO_TB (user_id,user_prfile_id,code,value,created_at,updated_at)
+                            INSERT INTO TANOS_USER_INFO_TB (user_id,user_profile_id,code,value,created_at,updated_at)
                             VALUES (%s,%s,%s,%s,%s,%s)
                             ON DUPLICATE KEY UPDATE value=%s, updated_at=%s
                         """,
@@ -89,47 +89,22 @@ def push_user_data_to_lake_schema(msg_list: List):
             logger.info("Closing Connection")
 
 
-def receive_sqs():
-    _sqs = boto3.client(
-        "sqs",
-        region_name=AWS_REGION_NAME,
-        aws_access_key_id=AWS_ACCESS_KEY,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-    )
-
+def receive_sqs(event):
     total = 0
     msg_list = []
     try:
-        for message in receive_after_delete(_sqs):
-            if message['Body']:
-                msg_list.append(message)
+        for message in event['Records']:
+            if message['body']:
+                msg_list.append(message["body"])
                 total += 1
-                logger.info("[receive_sqs] Target Message %s", message['Body'])
+                logger.info("[receive_sqs] Target Message %s", message['body'])
     except Exception as e:
         logger.info("SQS Fail : {}".format(e))
         send_slack_message('Exception: {}'.format(str(e)), "[FAIL] SQS_USER_DATA_SYNC_TO_LAKE")
 
-    #### 처리 로직 -> data push to data lake ####
+    ### 처리 로직 -> data push to data lake ####
     push_user_data_to_lake_schema(msg_list)
-    ##########################################
-
-    if msg_list:
-        entries = [
-            {'Id': msg['MessageId'], 'ReceiptHandle': msg['ReceiptHandle']}
-            for msg in msg_list
-        ]
-        try:
-            resp = _sqs.delete_message_batch(
-                QueueUrl=SQS_BASE + "/" + SQS_NAME, Entries=entries
-            )
-        except Exception as e:
-            logger.exception("Error while delete messages or processing. %s", e)
-
-        if len(resp['Successful']) != len(entries):
-            send_slack_message('Exception: {}'.format(str(e)), f"Failed to delete messages: entries={entries!r} resp={resp!r}")
-            raise RuntimeError(
-                f"Failed to delete messages: entries={entries!r} resp={resp!r}"
-            )
+    #########################################
 
     dict_ = {
         'result': True, 'total': total,
@@ -137,41 +112,6 @@ def receive_sqs():
     return dict_
 
 
-def receive_after_delete(sqs_client) -> bool:
-    _sqs = sqs_client
-    __target_q = None
-
-    while True:
-        if not __target_q:
-            __target_q = (
-                    SQS_BASE
-                    + "/"
-                    + SQS_NAME
-            )
-            logger.debug(
-                "[receive_after_delete] Target Queue {0}".format(__target_q)
-            )
-
-        # SQS에 큐가 비워질때까지 메세지 조회
-        resp = _sqs.receive_message(
-            QueueUrl=__target_q,
-            AttributeNames=['All'],
-            MaxNumberOfMessages=10
-        )
-
-        try:
-            """
-            제너레이터는 함수 끝까지 도달하면 StopIteration 예외가 발생. 
-            마찬가지로 return도 함수를 끝내므로 return을 사용해서 함수 중간에 빠져나오면 StopIteration 예외가 발생.
-            특히 제너레이터 안에서 return에 반환값을 지정하면 StopIteration 예외의 에러 메시지로 들어감
-            """
-            yield from resp['Messages']
-        except KeyError:
-            # not has next
-            return False
-
-
 def lambda_handler(event, context):
-    result: dict = receive_sqs()
-
+    result: dict = receive_sqs(event)
     return result
