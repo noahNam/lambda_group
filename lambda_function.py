@@ -37,10 +37,11 @@ conn = None
 
 def send_slack_message(message, title):
     text = title + " -> " + message
-    requests.post("https://slack.com/api/chat.postMessage",
-                  headers={"Authorization": "Bearer " + SLACK_TOKEN},
-                  data={"channel": CHANNEL, "text": text}
-                  )
+    requests.post(
+        "https://slack.com/api/chat.postMessage",
+        headers={"Authorization": "Bearer " + SLACK_TOKEN},
+        data={"channel": CHANNEL, "text": text},
+    )
 
 
 def openConnection():
@@ -49,7 +50,13 @@ def openConnection():
         logger.info("Opening Connection")
         if conn is None:
             conn = pymysql.connect(
-                host=host, db=database, user=user, password=password, port=port, connect_timeout=5)
+                host=host,
+                db=database,
+                user=user,
+                password=password,
+                port=port,
+                connect_timeout=5,
+            )
         else:
             conn.ping(reconnect=True)
 
@@ -65,15 +72,24 @@ def push_user_data_to_lake_schema(msg_list: List):
             for msg in msg_list:
                 try:
                     data = json.loads(msg)
-                    data = data['msg']
+                    data = data["msg"]
                     cur.execute(
                         """
                             INSERT INTO TANOS_USER_INFO_TB (user_id,user_profile_id,code,value,created_at,updated_at)
                             VALUES (%s,%s,%s,%s,%s,%s)
                             ON DUPLICATE KEY UPDATE value=%s, updated_at=%s
                         """,
-                        (data['user_id'], data['user_profile_id'], data['code'], data['value'], datetime.now(),
-                         datetime.now(), data['value'], datetime.now()))
+                        (
+                            data["user_id"],
+                            data["user_profile_id"],
+                            data["code"],
+                            data["value"],
+                            datetime.now(),
+                            datetime.now(),
+                            data["value"],
+                            datetime.now(),
+                        ),
+                    )
                     conn.commit()
                 except Exception as e:
                     logger.exception("Error while upsert data lake schema %s", e)
@@ -89,25 +105,52 @@ def push_user_data_to_lake_schema(msg_list: List):
             logger.info("Closing Connection")
 
 
+def call_jarvis_surveys_analysis_api(user_id: int) -> int:
+    # todo. 자비스 API 만들어지면 변경 필요
+    response = requests.get(
+        url="https://www.apartalk.com/api/jarvis/v1/predict/survey?survey_type2={}&user_id={}".format(
+            user_id, user_id
+        ),
+        headers={
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache",
+            # "Authorization": dto.auth_header,
+        },
+    )
+
+    return response.status_code
+
+
 def receive_sqs(event):
     total = 0
     msg_list = []
     try:
-        for message in event['Records']:
-            if message['body']:
+        for message in event["Records"]:
+            if message["body"]:
                 msg_list.append(message["body"])
                 total += 1
-                logger.info("[receive_sqs] Target Message %s", message['body'])
+                logger.info("[receive_sqs] Target Message %s", message["body"])
     except Exception as e:
         logger.info("SQS Fail : {}".format(e))
-        send_slack_message('Exception: {}'.format(str(e)), "[FAIL] SQS_USER_DATA_SYNC_TO_LAKE")
+        send_slack_message(
+            "Exception: {}".format(str(e)), "[FAIL] SQS_USER_DATA_SYNC_TO_LAKE"
+        )
 
-    ### 처리 로직 -> data push to data lake ####
+    # 처리 로직 -> data push to data lake ####
     push_user_data_to_lake_schema(msg_list)
+
+    user_id = json.loads(msg_list[0])["msg"]["user_id"]
+    status_code = call_jarvis_surveys_analysis_api(user_id=user_id)
+    if status_code != 200:
+        send_slack_message(
+            "user_id={}".format(user_id),
+            "Exception: call jarvis surveys analytics_api ",
+        )
     #########################################
 
     dict_ = {
-        'result': True, 'total': total,
+        "result": True,
+        "total": total,
     }
     return dict_
 
