@@ -1,10 +1,10 @@
 # What is [lambda-group](https://bitbucket.org/apartalk/hawkeye/src)?
 * except for notification role of Apartalk
-    * Hawkeye(푸쉬기능)을 제외한 람다 함수들 모
+    * Hawkeye(푸쉬기능)을 제외한 람다 함수들 모음
 * serverless service
 * version 
     * python : 3.8
-## Deploy음
+## Deploy
 * build_{$name}.sh 실행 하여 생성된 lambda.zip을 해당하는 AWS Lambda Service로 업로드 한다.
 * deploy 폴더에는 각 람다 함수가 들어가 있고 build_{$name}.sh 실행 시 업로드 형태로 패키징 해준다.
 ## A point of caution
