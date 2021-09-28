@@ -106,7 +106,7 @@ def push_user_data_to_lake_schema(msg_list: List):
 
 
 def call_jarvis_surveys_analysis_api(survey_step: int, user_id: int) -> int:
-    response = requests.get(
+    response = requests.post(
         url="https://www.apartalk.com/api/jarvis/v1/predicts/surveys?survey_step={}&user_id={}".format(
             survey_step, user_id
         ),
