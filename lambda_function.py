@@ -138,15 +138,16 @@ def receive_sqs(event):
     # 처리 로직 -> data push to data lake ####
     push_user_data_to_lake_schema(msg_list)
 
-    user_id = json.loads(msg_list[0])["msg"]["user_id"]
-    survey_step = int(json.loads(msg_list[0])["msg"]["survey_step"])
+    for msg in msg_list:
+        user_id = json.loads(msg)["msg"]["user_id"]
+        survey_step = json.loads(msg)["msg"]["survey_step"]
 
-    status_code = call_jarvis_surveys_analysis_api(user_id=user_id, survey_step=survey_step)
-    if status_code != 200:
-        send_slack_message(
-            "user_id={}".format(user_id),
-            "Exception: call jarvis create user surveys analytics api",
-        )
+        status_code = call_jarvis_surveys_analysis_api(user_id=user_id, survey_step=survey_step)
+        if status_code != 200:
+            send_slack_message(
+                "user_id={}".format(user_id),
+                "Exception: call jarvis surveys analytics_api ",
+            )
     #########################################
 
     dict_ = {
