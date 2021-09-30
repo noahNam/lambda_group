@@ -106,15 +106,19 @@ def push_user_data_to_lake_schema(msg_list: List):
 
 
 def call_jarvis_surveys_analysis_api(survey_step: int, user_id: int) -> int:
+    data = dict(
+        survey_step=survey_step,
+        user_id=user_id,
+    )
+
     response = requests.post(
-        url="https://www.apartalk.com/api/jarvis/v1/predicts/surveys?survey_step={}&user_id={}".format(
-            survey_step, user_id
-        ),
+        url="https://www.apartalk.com/api/jarvis/v1/predicts/surveys",
         headers={
             "Content-Type": "application/json",
             "Cache-Control": "no-cache",
             # "Authorization": dto.auth_header,
         },
+        data=json.dumps(data),
     )
 
     return response.status_code
