@@ -105,11 +105,10 @@ def push_user_data_to_lake_schema(msg_list: List):
             logger.info("Closing Connection")
 
 
-def call_jarvis_surveys_analysis_api(user_id: int) -> int:
-    # todo. 자비스 API 만들어지면 변경 필요
-    response = requests.get(
-        url="https://www.apartalk.com/api/jarvis/v1/predict/survey?survey_type2={}&user_id={}".format(
-            user_id, user_id
+def call_jarvis_surveys_analysis_api(survey_step: int, user_id: int) -> int:
+    response = requests.post(
+        url="https://www.apartalk.com/api/jarvis/v1/predicts/surveys?survey_step={}&user_id={}".format(
+            survey_step, user_id
         ),
         headers={
             "Content-Type": "application/json",
@@ -139,13 +138,19 @@ def receive_sqs(event):
     # 처리 로직 -> data push to data lake ####
     push_user_data_to_lake_schema(msg_list)
 
-    user_id = json.loads(msg_list[0])["msg"]["user_id"]
-    status_code = call_jarvis_surveys_analysis_api(user_id=user_id)
-    if status_code != 200:
-        send_slack_message(
-            "user_id={}".format(user_id),
-            "Exception: call jarvis surveys analytics_api ",
-        )
+    for msg in msg_list:
+        user_id = json.loads(msg)["msg"]["user_id"]
+        survey_step = json.loads(msg)["msg"]["survey_step"]
+
+        # 1단계 설문 완료 이후 부터 api call
+        if survey_step >= 2:
+            status_code = call_jarvis_surveys_analysis_api(user_id=user_id, survey_step=survey_step)
+
+            if status_code != 200:
+                send_slack_message(
+                    "user_id={}".format(user_id),
+                    "Exception: call jarvis surveys analytics_api ",
+                )
     #########################################
 
     dict_ = {
