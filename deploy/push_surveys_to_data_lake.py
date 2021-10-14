@@ -5,6 +5,9 @@ import logging
 
 from datetime import datetime
 from typing import List
+
+import jwt
+
 import chardet
 from package import requests
 from package import pymysql
@@ -34,6 +37,7 @@ CHANNEL = os.environ.get("CHANNEL")
 
 # Jarvis Host
 JARVIS_HOST = os.environ.get("JARVIS_HOST")
+JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
 
 conn = None
 
@@ -115,12 +119,13 @@ def call_jarvis_surveys_analysis_api(survey_step: int, user_id: int) -> int:
         user_id=user_id,
     )
 
+    encoded_jwt = jwt.encode({"identity": user_id}, JWT_SECRET_KEY, algorithm="HS256")
     response = requests.post(
         url=host_url + "/api/jarvis/v1/predicts/surveys",
         headers={
             "Content-Type": "application/json",
             "Cache-Control": "no-cache",
-            # "Authorization": dto.auth_header,
+            "Authorization": "Bearer " + encoded_jwt,
         },
         data=json.dumps(data),
     )
@@ -152,7 +157,9 @@ def receive_sqs(event):
 
         # 1단계 설문 완료 이후 부터 api call
         if survey_step >= 2:
-            status_code = call_jarvis_surveys_analysis_api(user_id=user_id, survey_step=survey_step)
+            status_code = call_jarvis_surveys_analysis_api(
+                user_id=user_id, survey_step=survey_step
+            )
 
             if status_code != 200:
                 send_slack_message(
