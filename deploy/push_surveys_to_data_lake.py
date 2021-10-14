@@ -134,7 +134,7 @@ def call_jarvis_surveys_analysis_api(survey_step: int, user_id: int) -> int:
         data=json.dumps(data),
     )
 
-    return response.status_code
+    return response
 
 
 def receive_sqs(event):
@@ -161,14 +161,14 @@ def receive_sqs(event):
 
         # 1단계 설문 완료 이후 부터 api call
         if survey_step >= 2:
-            status_code = call_jarvis_surveys_analysis_api(
+            response = call_jarvis_surveys_analysis_api(
                 user_id=user_id, survey_step=survey_step
             )
 
-            if status_code != 200:
+            if response.status_code != 200:
                 send_slack_message(
-                    "user_id={}".format(user_id),
-                    "Exception: call jarvis surveys analytics_api ",
+                    "jarvis call error by user_id={}".format(user_id),
+                    str(response.json()),
                 )
     #########################################
 
