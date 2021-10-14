@@ -10,6 +10,7 @@ boto3 = "^1.17.99"
 PyMySQL = "^1.0.2"
 requests = "^2.25.1"
 PyJWT = "^2.2.0"
+pytz = "^2021.3"
 
 [tool.poetry.dev-dependencies]
 
