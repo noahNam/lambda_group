@@ -1,16 +1,14 @@
 import json
 import os
-import boto3
 import logging
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 
-import jwt
-
-import chardet
 from package import requests
 from package import pymysql
+from package.pyjwt import jwt
+from package.pytz import timezone
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -118,8 +116,14 @@ def call_jarvis_surveys_analysis_api(survey_step: int, user_id: int) -> int:
         survey_step=survey_step,
         user_id=user_id,
     )
-
-    encoded_jwt = jwt.encode({"identity": user_id}, JWT_SECRET_KEY, algorithm="HS256")
+    encoded_jwt = jwt.encode(
+        {
+            "identity": user_id,
+            "exp": datetime.now(timezone("Asia/Seoul")) + timedelta(seconds=30),
+        },
+        JWT_SECRET_KEY,
+        algorithm="HS256",
+    )
     response = requests.post(
         url=host_url + "/api/jarvis/v1/predicts/surveys",
         headers={
