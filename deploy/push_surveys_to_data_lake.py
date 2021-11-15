@@ -9,6 +9,7 @@ from package import requests
 from package import pymysql
 from package.pyjwt import jwt
 from package.pytz import timezone
+from package.requests import Response
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -19,15 +20,6 @@ user = os.environ.get("USER")
 password = os.environ.get("PASSWORD")
 database = os.environ.get("DATABASE")
 port = int(os.environ.get("PORT"))
-
-# set enum
-AWS_ACCESS_KEY = os.environ.get("ACCESS_KEY")
-AWS_SECRET_ACCESS_KEY = os.environ.get("SECRET_ACCESS_KEY")
-AWS_REGION_NAME = os.environ.get("AWS_REGION_NAME")
-
-# SQS
-SQS_BASE = os.environ.get("SQS_BASE")
-SQS_NAME = os.environ.get("SQS_NAME")
 
 # SLACK
 SLACK_TOKEN = os.environ.get("SLACK_TOKEN")
@@ -110,7 +102,7 @@ def push_user_data_to_lake_schema(msg_list: List):
             logger.info("Closing Connection")
 
 
-def call_jarvis_surveys_analysis_api(survey_step: int, user_id: int) -> int:
+def call_jarvis_surveys_analysis_api(survey_step: int, user_id: int) -> Response:
     host_url = JARVIS_HOST
     data = dict(
         survey_step=survey_step,
