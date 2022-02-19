@@ -144,7 +144,7 @@ def get_dau():
         new_user_one_day=new_user_one_day,
         new_user_two_day=new_user_two_day,
         current_user_percentage=current_user_percentage,
-        new_user_percentage=new_user_percentage
+        new_user_percentage=round(float(new_user_percentage))
     )
 
 
@@ -153,7 +153,12 @@ def lambda_handler(event, context):
 
     now = datetime.datetime.now()
     title = f'🚀 사용자 일일 지표 [{now.strftime("%Y-%m-%d")}] '
-    message = f' DAU -> {dau_dict.get("current_user_one_day")}명 \n새로 가입한 유저 -> {dau_dict.get("new_user_one_day")}명 \n전날대비 접속자 비율 -> {dau_dict.get("current_user_percentage")}% \n전날대비 가입자 비율 -> {dau_dict.get("new_user_percentage")}%'
+    """
+    메세지 수정사항
+    전날대비 접속자 비율은 확인 불가하다.
+    2일전 접속 유저가 어제 접속을 했다면 2일전 유저의 카운트가 -1이 되기 때문이다. 따라서 전달대비 접속자 비율은 계산은 할 수 없다.
+    """
+    message = f' DAU -> {dau_dict.get("current_user_one_day")}명 \n새로 가입한 유저 -> {dau_dict.get("new_user_one_day")}명 \n전날대비 가입자 비율 -> {dau_dict.get("new_user_percentage")}%'
 
     send_slack_message(message=message, title=title)
 
