@@ -17,11 +17,6 @@ password = os.environ.get("PASSWORD")
 database = os.environ.get("DATABASE")
 port = os.environ.get("PORT")
 
-# status
-WAIT = 0
-SUCCESS = 1
-FAILURE = 2
-
 # SLACK
 SLACK_TOKEN = os.environ.get("SLACK_TOKEN")
 CHANNEL = os.environ.get("CHANNEL")
@@ -78,87 +73,96 @@ def get_dau():
         openConnection()
         with conn.cursor() as cur:
             cur.execute(
-                f"select p.cond1 as "'하루전접속자수'", "
-                f"p.cond2 as "'이틀전접속자'", "
-                f"p.cond3 as "'하루전새로가입한유저수'", "
-                f"p.cond4 as "'이틀전새로가입한유저수'" "
-                f"from ( "
-                f"select count(1) as cond1, 0 as cond2, 0 as cond3, 0 as cond4 "
-                f"from users "
-                f"where to_char(current_connection_time, 'YYYY-MM-DD') = to_char(now() - '1 day'::interval, 'YYYY-MM-DD') "
-                f"union all "
-                f"select count(1) as cond1, 0 as cond2, 0 as cond3, 0 as cond4 "
-                f"from users "
-                f"where to_char(current_connection_time, 'YYYY-MM-DD') = to_char(now() - '2 day'::interval, 'YYYY-MM-DD') "
-                f"union all "
-                f"select count(1) as cond1, 0 as cond2, 0 as cond3, 0 as cond4 "
-                f"from users "
-                f"where to_char(created_at, 'YYYY-MM-DD') = to_char(now() - '1 day'::interval, 'YYYY-MM-DD') "
-                f"union all "
-                f"select count(1) as cond1, 0 as cond2, 0 as cond3, 0 as cond4 "
-                f"from users "
-                f"where to_char(created_at, 'YYYY-MM-DD') = to_char(now() - '2 day'::interval, 'YYYY-MM-DD') "
-                f" ) as p"
+                f"select sum(p.total_user)    as total_user,"
+                f"       sum(p.new_user)      as new_user,"
+                f"       sum(p.out_user)      as out_user,"
+                f"       sum(p.post_count)    as post_count,"
+                f"       sum(p.comment_count) as comment_count"
+                f" from (select count(1) as total_user,"
+                f"             0        as new_user,"
+                f"             0        as out_user,"
+                f"             0        as post_count,"
+                f"             0        as comment_count"
+                f"      from users"
+                f"      where is_available = TRUE"
+                f"      union all"
+                f"      select 0        as total_user,"
+                f"             count(1) as new_user,"
+                f"             0        as out_user,"
+                f"             0        as post_count,"
+                f"             0        as comment_count"
+                f"      from users"
+                f"      where join_date = to_char(now(), 'YYYYMMDD')"
+                f"      union all"
+                f"      select 0        as total_user,"
+                f"             0        as new_user,"
+                f"             count(1) as out_user,"
+                f"             0        as post_count,"
+                f"             0        as comment_count"
+                f"      from users"
+                f"      where is_out = True"
+                f"        and to_char(now(), 'YYYYMMDD') = to_char(updated_at, 'YYYYMMDD')"
+                f"      union all"
+                f"      select 0        as total_user,"
+                f"             0        as new_user,"
+                f"             0        as out_user,"
+                f"             count(1) as post_count,"
+                f"             0        as comment_count"
+                f"      from posts"
+                f"      where is_deleted = false"
+                f"          and to_char(created_at, 'YYYYMMDD') = to_char(now(), 'YYYYMMDD')"
+                f"      union all"
+                f"      select 0        as total_user,"
+                f"             0        as new_user,"
+                f"             0        as out_user,"
+                f"             0        as post_count,"
+                f"             count(1) as comment_count"
+                f"      from comments"
+                f"      where is_deleted = false"
+                f"          and to_char(created_at, 'YYYYMMDD') = to_char(now(), 'YYYYMMDD')) as p"
             )
 
-            current_user_one_day = 0
-            current_user_two_day = 0
-            new_user_one_day = 0
-            new_user_two_day = 0
-            current_user_percentage = 0
-            new_user_percentage = 0
+            total_user = 0
+            new_user = 0
+            out_user = 0
+            post_count = 0
+            comment_count = 0
 
             for idx, row in enumerate(cur):
                 if idx == 0:
-                    current_user_one_day = row[0]
+                    total_user = row[0]
                 elif idx == 1:
-                    current_user_two_day = row[0]
+                    new_user = row[0]
                 elif idx == 2:
-                    new_user_one_day = row[0]
+                    out_user = row[0]
+                elif idx == 3:
+                    post_count = row[0]
                 else:
-                    new_user_two_day = row[0]
+                    comment_count = row[0]
 
-            print("하루전접속자수 ------> ", current_user_one_day)
-            print("이틀전접속자 ------> ", current_user_two_day)
-            print("하루전새로가입한유저수 ------> ", new_user_one_day)
-            print("이틀전새로가입한유저수 ------> ", new_user_two_day)
-
-            # 전날대비 접속자 비율 (어제 접속자 수 - 이틀전 접속자 수) / 이틀전 접속자 수
-            if current_user_two_day != 0:
-                current_user_percentage = (current_user_one_day - current_user_two_day) / current_user_two_day * 100
-            else:
-                current_user_percentage = current_user_one_day * 100
-
-            # 전날대비 가입자 비율 (어제 접속자 수 - 이틀전 접속자 수) / 이틀전 접속자 수
-            if new_user_two_day != 0:
-                new_user_percentage = (new_user_one_day - new_user_two_day) / new_user_two_day * 100
-            else:
-                new_user_percentage = new_user_one_day * 100
+            print("총 활성화 유저 ------> ", total_user)
+            print("신규 가입 유저 ------> ", new_user)
+            print("탈퇴 유저 ------> ", out_user)
+            print("새 글수 ------> ", post_count)
+            print("새 댓글수 ------> ", comment_count)
 
     except Exception as e:
         logger.info("Error while opening connection or processing. %s", e)
 
     return dict(
-        current_user_one_day=current_user_one_day,
-        current_user_two_day=current_user_two_day,
-        new_user_one_day=new_user_one_day,
-        new_user_two_day=new_user_two_day,
-        current_user_percentage=current_user_percentage,
-        new_user_percentage=round(float(new_user_percentage))
+        total_user=total_user,
+        new_user=new_user,
+        out_user=out_user,
+        post_count=post_count,
+        comment_count=comment_count,
     )
 
 
 def lambda_handler(event, context):
     dau_dict: dict = get_dau()
 
-    now = datetime.datetime.now()
-    title = f'🚀 사용자 일일 지표 [{now.strftime("%Y-%m-%d")}] '
-    """
-    메세지 수정사항
-    전날대비 접속자 비율은 확인 불가하다.
-    2일전 접속 유저가 어제 접속을 했다면 2일전 유저의 카운트가 -1이 되기 때문이다. 따라서 전달대비 접속자 비율은 계산은 할 수 없다.
-    """
-    message = f' DAU -> {dau_dict.get("current_user_one_day")}명 \n새로 가입한 유저 -> {dau_dict.get("new_user_one_day")}명 \n전날대비 가입자 비율 -> {dau_dict.get("new_user_percentage")}%'
+    title = f'🚀 사용자 일일 지표'
+    message = f' 총 활성화 유저 -> {dau_dict.get("total_user")}명 \n신규 유저 -> {dau_dict.get("new_user")}명 \n탈퇴 유저 -> {dau_dict.get("out_user")}명 \n새 글수 -> {dau_dict.get("post_count")}개 \n새 댓글수 -> {dau_dict.get("comment_count")}개'
 
     send_slack_message(message=message, title=title)
 
